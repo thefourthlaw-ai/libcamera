@@ -11,6 +11,7 @@
 #include <array>
 #include <chrono>
 #include <errno.h>
+#include <thread>
 #include <map>
 #include <memory>
 #include <ostream>
@@ -137,6 +138,15 @@ VirtualCameraData::VirtualCameraData(PipelineHandler *pipe,
 
 void VirtualCameraData::processRequest(Request *request)
 {
+	/* Enforce frame rate limiting */
+	auto now = std::chrono::steady_clock::now();
+	auto elapsed = now - lastFrameTime_;
+	if (elapsed < frameDuration_) {
+		auto sleepTime = frameDuration_ - elapsed;
+		std::this_thread::sleep_for(sleepTime);
+	}
+	lastFrameTime_ = std::chrono::steady_clock::now();
+
 	for (auto const &[stream, buffer] : request->buffers()) {
 		bool found = false;
 		/* map buffer and fill test patterns */

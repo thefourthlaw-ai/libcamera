@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <chrono>
 #include <string>
 #include <variant>
 #include <vector>
@@ -66,6 +67,10 @@ public:
 
 	std::vector<StreamConfig> streamConfigs_;
 	Signal<FrameBuffer *> bufferCompleted;
+
+	/* Frame rate limiting */
+	std::chrono::steady_clock::time_point lastFrameTime_;
+	std::chrono::microseconds frameDuration_{ 33333 }; /* Default 30 fps */
 };
 
 } /* namespace libcamera */
