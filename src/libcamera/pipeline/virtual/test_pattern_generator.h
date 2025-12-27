@@ -11,6 +11,7 @@
 
 #include <libcamera/framebuffer.h>
 #include <libcamera/geometry.h>
+#include <libcamera/pixel_format.h>
 
 #include "frame_generator.h"
 
@@ -25,10 +26,12 @@ class TestPatternGenerator : public FrameGenerator
 {
 public:
 	int generateFrame(const Size &size, const FrameBuffer *buffer) override;
+	void setPixelFormat(const PixelFormat &format) { pixelFormat_ = format; }
 
 protected:
 	/* Buffer of test pattern template */
 	std::unique_ptr<uint8_t[]> template_;
+	PixelFormat pixelFormat_;
 };
 
 class ColorBarsGenerator : public TestPatternGenerator

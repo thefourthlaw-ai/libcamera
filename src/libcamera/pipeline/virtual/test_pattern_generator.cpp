@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include <libcamera/base/log.h>
+#include <libcamera/formats.h>
 
 #include "libcamera/internal/mapped_framebuffer.h"
 
@@ -51,13 +52,39 @@ int TestPatternGenerator::generateFrame(const Size &size,
 
 	rotateLeft1Column<kARGBSize>(size, template_.get());
 
-	/* Convert the template_ to the frame buffer */
-	int ret = libyuv::ARGBToNV12(template_.get(), size.width * kARGBSize,
-				     planes[0].begin(), size.width,
-				     planes[1].begin(), size.width,
-				     size.width, size.height);
-	if (ret != 0)
-		LOG(Virtual, Error) << "ARGBToNV12() failed with " << ret;
+	int ret = 0;
+
+	if (pixelFormat_ == formats::RGB888) {
+		/* Convert ARGB (BGRA in memory) to RGB888 */
+		uint8_t *dst = planes[0].begin();
+		const uint8_t *src = template_.get();
+		for (size_t i = 0; i < size.width * size.height; i++) {
+			dst[0] = src[2]; /* R */
+			dst[1] = src[1]; /* G */
+			dst[2] = src[0]; /* B */
+			dst += 3;
+			src += 4;
+		}
+	} else if (pixelFormat_ == formats::BGR888) {
+		/* Convert ARGB (BGRA in memory) to BGR888 */
+		uint8_t *dst = planes[0].begin();
+		const uint8_t *src = template_.get();
+		for (size_t i = 0; i < size.width * size.height; i++) {
+			dst[0] = src[0]; /* B */
+			dst[1] = src[1]; /* G */
+			dst[2] = src[2]; /* R */
+			dst += 3;
+			src += 4;
+		}
+	} else {
+		/* Default: Convert the template_ to NV12 */
+		ret = libyuv::ARGBToNV12(template_.get(), size.width * kARGBSize,
+					 planes[0].begin(), size.width,
+					 planes[1].begin(), size.width,
+					 size.width, size.height);
+		if (ret != 0)
+			LOG(Virtual, Error) << "ARGBToNV12() failed with " << ret;
+	}
 
 	return ret;
 }

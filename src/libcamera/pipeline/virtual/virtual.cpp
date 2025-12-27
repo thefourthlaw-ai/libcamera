@@ -39,6 +39,7 @@
 #include "libcamera/internal/yaml_parser.h"
 
 #include "pipeline/virtual/config_parser.h"
+#include "test_pattern_generator.h"
 
 namespace libcamera {
 
@@ -208,14 +209,21 @@ CameraConfiguration::Status VirtualCameraConfiguration::validate()
 			adjusted = true;
 		}
 
-		if (cfg.pixelFormat != formats::NV12) {
+		if (cfg.pixelFormat != formats::NV12 &&
+		    cfg.pixelFormat != formats::RGB888 &&
+		    cfg.pixelFormat != formats::BGR888) {
 			cfg.pixelFormat = formats::NV12;
 			status = Adjusted;
 			adjusted = true;
 		}
 
-		if (cfg.colorSpace != ColorSpace::Rec709) {
-			cfg.colorSpace = ColorSpace::Rec709;
+		/* Use sRGB for RGB formats, Rec709 for YUV */
+		ColorSpace expectedColorSpace = (cfg.pixelFormat == formats::RGB888 ||
+						 cfg.pixelFormat == formats::BGR888)
+						? ColorSpace::Srgb
+						: ColorSpace::Rec709;
+		if (cfg.colorSpace != expectedColorSpace) {
+			cfg.colorSpace = expectedColorSpace;
 			status = Adjusted;
 			adjusted = true;
 		}
@@ -281,11 +289,14 @@ PipelineHandlerVirtual::generateConfiguration(Camera *camera,
 		}
 
 		std::map<PixelFormat, std::vector<SizeRange>> streamFormats;
-		PixelFormat pixelFormat = formats::NV12;
-		streamFormats[pixelFormat] = { { data->config_.minResolutionSize,
-						 data->config_.maxResolutionSize } };
+		SizeRange sizes = { data->config_.minResolutionSize,
+				    data->config_.maxResolutionSize };
+		streamFormats[formats::NV12] = { sizes };
+		streamFormats[formats::RGB888] = { sizes };
+		streamFormats[formats::BGR888] = { sizes };
 		StreamFormats formats(streamFormats);
 		StreamConfiguration cfg(formats);
+		PixelFormat pixelFormat = formats::NV12;
 		cfg.pixelFormat = pixelFormat;
 		cfg.size = data->config_.maxResolutionSize;
 		cfg.bufferCount = VirtualCameraConfiguration::kBufferCount;
@@ -305,6 +316,11 @@ int PipelineHandlerVirtual::configure(Camera *camera,
 	VirtualCameraData *data = cameraData(camera);
 	for (auto [i, c] : utils::enumerate(*config)) {
 		c.setStream(&data->streamConfigs_[i].stream);
+		/* Set the pixel format for the frame generator if it supports it */
+		auto *testPatternGen = dynamic_cast<TestPatternGenerator *>(
+			data->streamConfigs_[i].frameGenerator.get());
+		if (testPatternGen)
+			testPatternGen->setPixelFormat(c.pixelFormat);
 		/* Start reading the images/generating test patterns */
 		data->streamConfigs_[i].frameGenerator->configure(c.size);
 	}
